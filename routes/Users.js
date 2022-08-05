@@ -54,14 +54,20 @@ router.post("/login", async (req, res) => {
     if (user) {
       bcrypt.compare(password, user.password).then((match) => {
         if (!match) {
-          res.json({ error: "wrong username and password combination" });
+          res
+            .status(250)
+            .json({ error: "wrong username and password combination" });
         } else {
-          res.json({ success: "you logged in" });
+          res.json({ success: "you logged in", user });
         }
+      });
+    } else {
+      res.json({
+        error: "user doesn't exist",
       });
     }
   } catch (error) {
-    res.json({ error: "something went wrong while logging in" });
+    res.status(300).json({ error: "something went wrong while logging in" });
   }
 });
 
