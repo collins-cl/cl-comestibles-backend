@@ -2,6 +2,8 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const router = express.Router();
 const { Users } = require("../models");
+const dotenv = require("dotenv").config;
+const { sign } = require("jsonwebtoken");
 
 router.post("/register", async (req, res) => {
   const password = req.body.password;
@@ -58,12 +60,16 @@ router.post("/login", async (req, res) => {
             .status(250)
             .json({ error: "wrong username and password combination" });
         } else {
-          res.json({ success: "you logged in", user });
+          const accessToken = sign(
+            { email: user.email, id: user.id },
+            "accessToken"
+          );
+          res.json({ success: "you logged in", accessToken: accessToken });
         }
       });
     } else {
       res.json({
-        error: "user doesn't exist",
+        error: "wrong username and password",
       });
     }
   } catch (error) {
