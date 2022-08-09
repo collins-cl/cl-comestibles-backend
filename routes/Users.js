@@ -2,9 +2,9 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const router = express.Router();
 const { Users } = require("../models");
-const dotenv = require("dotenv").config;
 const { sign } = require("jsonwebtoken");
 
+//create user(if none exits in db)
 router.post("/register", async (req, res) => {
   const password = req.body.password;
   const email = req.body.email;
@@ -47,6 +47,7 @@ router.post("/register", async (req, res) => {
     });
 });
 
+//login into user account
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
@@ -64,7 +65,11 @@ router.post("/login", async (req, res) => {
             { email: user.email, id: user.id },
             "accessToken"
           );
-          res.json({ success: "you logged in", accessToken: accessToken });
+          res.json({
+            success: "you logged in",
+            user,
+            accessToken: accessToken,
+          });
         }
       });
     } else {
