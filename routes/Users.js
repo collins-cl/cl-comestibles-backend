@@ -61,10 +61,7 @@ router.post("/login", async (req, res) => {
             .status(250)
             .json({ error: "wrong username and password combination" });
         } else {
-          const accessToken = sign(
-            { email: user.email, id: user.id },
-            "accessToken"
-          );
+          const accessToken = sign({ id: user.id }, "accessToken");
           res.json({
             success: "you logged in",
             user,
@@ -80,6 +77,12 @@ router.post("/login", async (req, res) => {
   } catch (error) {
     res.status(300).json({ error: "something went wrong while logging in" });
   }
+});
+
+//get user
+router.get("/user", async (req, res) => {
+  const currentUser = Users.findOne();
+  res.json(console.log(currentUser));
 });
 
 module.exports = router;
