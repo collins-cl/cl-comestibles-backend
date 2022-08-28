@@ -3,6 +3,8 @@ const bcrypt = require("bcryptjs");
 const router = express.Router();
 const { Users } = require("../models");
 const { sign } = require("jsonwebtoken");
+const nodemailer = require("nodemailer");
+const smtpT = require("nodemailer-smtp-transport");
 
 //create user(if none exits in db)
 router.post("/register", async (req, res) => {
@@ -79,10 +81,54 @@ router.post("/login", async (req, res) => {
   }
 });
 
-//get user
-router.get("/user", async (req, res) => {
-  const currentUser = Users.findOne();
-  res.json(console.log(currentUser));
+//resetting of password
+router.post("/forgetpassword", async (req, res) => {
+  const { email } = req.body;
+
+  const user = await Users.findOne({ where: { email: email } });
+
+  try {
+    if (!user) {
+      res.json({
+        error: "Account doesnt exist",
+      });
+    } else {
+      const link = "http://" + req.headers.host + "/api/users/reset" + user.id;
+
+      const transporter = nodemailer.createTransport(
+        smtpT({
+          service: "Gmail",
+          port: 587,
+          auth: {
+            user: "collinsolads@gmail.com",
+            password: "drzwthmjatxxsmfp",
+          },
+          authentication: "plain",
+          enable_starttls_auto: true,
+        })
+      );
+
+      const message = {
+        from: "collinsolads@gmail.com",
+        to: user.email,
+        subject: "Password Reset Link",
+        text: `Hi, ${user.firstname}  \n
+        Please click on the following link ${link} to reset your password.`,
+      };
+
+      transporter.sendMail(message, (error, info) => {
+        if (error) {
+          console.log(error);
+        } else {
+          console.log("success" + info);
+        }
+      });
+
+      res.json({ success: "Successful" });
+    }
+  } catch (error) {
+    console.log(error);
+  }
 });
 
 module.exports = router;
