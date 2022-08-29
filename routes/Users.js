@@ -4,7 +4,7 @@ const router = express.Router();
 const { Users } = require("../models");
 const { sign } = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
-const smtpT = require("nodemailer-smtp-transport");
+const Crypto = require("crypto");
 
 //create user(if none exits in db)
 router.post("/register", async (req, res) => {
@@ -86,6 +86,7 @@ router.post("/forgetpassword", async (req, res) => {
   const { email } = req.body;
 
   const user = await Users.findOne({ where: { email: email } });
+  const randomToken = Crypto.randomBytes(32).toString("base64");
 
   try {
     if (!user) {
@@ -93,38 +94,40 @@ router.post("/forgetpassword", async (req, res) => {
         error: "Account doesnt exist",
       });
     } else {
-      const link = "http://" + req.headers.host + "/api/users/reset" + user.id;
+      const link =
+        "http://" +
+        req.headers.host +
+        "/api/users/reset" +
+        user.id +
+        randomToken;
 
-      const transporter = nodemailer.createTransport(
-        smtpT({
-          service: "Gmail",
-          port: 587,
-          auth: {
-            user: "collinsolads@gmail.com",
-            password: "drzwthmjatxxsmfp",
-          },
-          authentication: "plain",
-          enable_starttls_auto: true,
-        })
-      );
+      const transporter = nodemailer.createTransport({
+        service: "Gmail",
+        host: "smtp.gmail.com",
+        port: 465,
+        secure: true,
+        auth: {
+          user: "collinsolads@gmail.com",
+          pass: "kuiwjsjayemjbqhv",
+        },
+        logger: true,
+      });
 
       const message = {
         from: "collinsolads@gmail.com",
         to: user.email,
         subject: "Password Reset Link",
-        text: `Hi, ${user.firstname}  \n
-        Please click on the following link ${link} to reset your password.`,
+        html: `Hi, ${user.firstname}  \n
+        Please click on the following <a href=${link}>${link}</a> to reset your password.`,
       };
-
-      transporter.sendMail(message, (error, info) => {
-        if (error) {
-          console.log(error);
-        } else {
-          console.log("success" + info);
-        }
-      });
-
-      res.json({ success: "Successful" });
+      try {
+        transporter.sendMail(message, (error, info) => {
+          res.json({ success: "Successful" });
+          console.log("success" + info.response);
+        });
+      } catch (error) {
+        console.log(error);
+      }
     }
   } catch (error) {
     console.log(error);
