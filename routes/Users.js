@@ -5,6 +5,9 @@ const { Users } = require("../models");
 const { sign } = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
 const Crypto = require("crypto");
+const dotenv = require("dotenv").config();
+const nodeuser = process.env.NODE_MAIL_EMAIL;
+const nodepassword = process.env.NODE_MAIL_PASSWORD;
 
 //create user(if none exits in db)
 router.post("/register", async (req, res) => {
@@ -107,24 +110,29 @@ router.post("/forgetpassword", async (req, res) => {
         port: 465,
         secure: true,
         auth: {
-          user: "collinsolads@gmail.com",
-          pass: "kuiwjsjayemjbqhv",
+          user: nodeuser,
+          pass: nodepassword,
         },
         logger: true,
       });
 
       const message = {
-        from: "collinsolads@gmail.com",
+        from: nodeuser,
         to: user.email,
         subject: "Password Reset Link",
-        html: `Hi, ${user.firstname}  \n
-        Please click on the following <a href=${link}>${link}</a> to reset your password.`,
+        text: `
+              Hi, ${user.firstname} \n Please click on the following{" "}
+              <a href=${link}>${link}</a> to reset your password.  
+          `,
       };
       try {
         transporter.sendMail(message, (error, info) => {
-          res.json({ success: "Successful" });
-          console.log("success" + info.response);
+          if (error) {
+            console.log(error);
+          }
+          return console.log("success" + info.response);
         });
+        res.json({ success: "Successful" });
       } catch (error) {
         console.log(error);
       }
