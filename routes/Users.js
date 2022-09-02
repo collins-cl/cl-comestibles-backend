@@ -102,18 +102,6 @@ router.post("/forgetpassword", async (req, res) => {
     });
   } else {
     try {
-      const transporter = nodemailer.createTransport({
-        service: "Gmail",
-        host: "smtp.gmail.com",
-        port: 465,
-        secure: true,
-        auth: {
-          user: nodeuser,
-          pass: nodepassword,
-        },
-        logger: true,
-      });
-
       Tokens.findOne({ where: { email: email } }).then((result) => {
         if (!result) {
           Tokens.create({
@@ -121,6 +109,18 @@ router.post("/forgetpassword", async (req, res) => {
             token: randomToken,
             expiresIn: newTime,
           }).then((result) => {
+            const transporter = nodemailer.createTransport({
+              service: "Gmail",
+              host: "smtp.gmail.com",
+              port: 465,
+              secure: true,
+              auth: {
+                user: nodeuser,
+                pass: nodepassword,
+              },
+              logger: true,
+            });
+
             const message = {
               from: nodeuser,
               to: user.email,
@@ -149,7 +149,7 @@ router.post("/forgetpassword", async (req, res) => {
           let Diff = result.expiresIn - currentTime;
           if (Diff < 0) {
             Tokens.destroy({ where: { email: email } });
-            res.json({ error: "Try resending another otp now" });
+            res.json({ error: "Please check your mail for the otp" });
           } else {
             res.json({
               error: "Please wait for 120 seconds before trying again.",
@@ -164,23 +164,40 @@ router.post("/forgetpassword", async (req, res) => {
 });
 
 //reset password
-router.post("/resetpassword", async (req, res) => {
-  const { otpcode, password } = req.body;
-
-  await Tokens.findOne({ where: { token: otpcode } }).then((result) => {
-    if (!result) {
-      res.json({
-        error: "OTP incorrect",
-      });
-    } else {
-      Users.findOne({ where: { email: result.email } }).then((match) => {
-        if (!match) {
-          res.json("emails doesnt match");
-        }
-        return Users.update({where : {password : password}})
-      });
-    }
-  });
+router.put("/resetpassword", async (req, res) => {
+  const { otpcode, newpassword } = req.body;
+  const salt = bcrypt.genSaltSync(10);
+  try {
+    await Tokens.findOne({ where: { token: otpcode } }).then((result) => {
+      if (!result) {
+        console.log("OTP incorrect");
+        res.json({
+          error: "OTP incorrect",
+        });
+      } else {
+        Users.findOne({ where: { email: result.email } }).then((result) => {
+          if (result) {
+            bcrypt.hash(newpassword, salt).then((hash) => {
+              if (hash) {
+                Users.update(
+                  { password: hash },
+                  { where: { email: result.email } }
+                );
+                res.json({
+                  success: "Successfully changed your password",
+                });
+                console.log("success");
+              }
+            });
+          } else {
+            console.log("error fetching user");
+          }
+        });
+      }
+    });
+  } catch (error) {
+    console.log(error);
+  }
 });
 
 module.exports = router;
