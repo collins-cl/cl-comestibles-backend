@@ -2,6 +2,7 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const router = express.Router();
 const { Users } = require("../models");
+const { Tokens } = require("../models");
 const { sign } = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
 const Crypto = require("crypto");
@@ -86,24 +87,21 @@ router.post("/login", async (req, res) => {
 
 //resetting of password
 router.post("/forgetpassword", async (req, res) => {
+  const randomToken = Crypto.randomBytes(6).toString("hex");
+
+  let newTime = new Date().getTime() + 120 * 1000;
+
   const { email } = req.body;
 
   const user = await Users.findOne({ where: { email: email } });
-  const randomToken = Crypto.randomBytes(32).toString("base64");
 
-  try {
-    if (!user) {
-      res.json({
-        error: "Account doesnt exist",
-      });
-    } else {
-      const link =
-        "http://" +
-        req.headers.host +
-        "/api/users/reset" +
-        user.id +
-        randomToken;
-
+  if (!user) {
+    res.json({
+      error: "Account doesnt exist",
+      user,
+    });
+  } else {
+    try {
       const transporter = nodemailer.createTransport({
         service: "Gmail",
         host: "smtp.gmail.com",
@@ -116,30 +114,73 @@ router.post("/forgetpassword", async (req, res) => {
         logger: true,
       });
 
-      const message = {
-        from: nodeuser,
-        to: user.email,
-        subject: "Password Reset Link",
-        text: `
-              Hi, ${user.firstname} \n Please click on the following{" "}
-              <a href=${link}>${link}</a> to reset your password.  
-          `,
-      };
-      try {
-        transporter.sendMail(message, (error, info) => {
-          if (error) {
-            console.log(error);
+      Tokens.findOne({ where: { email: email } }).then((result) => {
+        if (!result) {
+          Tokens.create({
+            email,
+            token: randomToken,
+            expiresIn: newTime,
+          }).then((result) => {
+            const message = {
+              from: nodeuser,
+              to: user.email,
+              subject: "Password Reset Token",
+              text: `
+                      Hi, ${user.firstname + " " + user.surname} \n
+                      You requested for a change in password and this unique code was sent to you \n
+                      to use as a one time password : ${result.token}\n
+                      which is set to expire in 2 minutes.
+                  `,
+            };
+            try {
+              transporter.sendMail(message, (error, info) => {
+                if (error) {
+                  console.log(error);
+                }
+                return console.log("success" + info.response);
+              });
+              res.json({ success: "Token sent successfully" });
+            } catch (error) {
+              console.log(error);
+            }
+          });
+        } else {
+          let currentTime = new Date().getTime();
+          let Diff = result.expiresIn - currentTime;
+          if (Diff < 0) {
+            Tokens.destroy({ where: { email: email } });
+            res.json({ error: "Try resending another otp now" });
+          } else {
+            res.json({
+              error: "Please wait for 120 seconds before trying again.",
+            });
           }
-          return console.log("success" + info.response);
-        });
-        res.json({ success: "Successful" });
-      } catch (error) {
-        console.log(error);
-      }
+        }
+      });
+    } catch (error) {
+      console.log(error);
     }
-  } catch (error) {
-    console.log(error);
   }
+});
+
+//reset password
+router.post("/resetpassword", async (req, res) => {
+  const { otpcode, password } = req.body;
+
+  await Tokens.findOne({ where: { token: otpcode } }).then((result) => {
+    if (!result) {
+      res.json({
+        error: "OTP incorrect",
+      });
+    } else {
+      Users.findOne({ where: { email: result.email } }).then((match) => {
+        if (!match) {
+          res.json("emails doesnt match");
+        }
+        return Users.update({where : {password : password}})
+      });
+    }
+  });
 });
 
 module.exports = router;
